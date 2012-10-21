@@ -9,3 +9,11 @@ Guiding principles:
  - Designed for linux (sorry OS X)
  - Single file script for ease of copying
 
+
+## Ubuntu 10.04 and up
+
+Need to run this:
+
+{{{bash
+$ echo 0 > /proc/sys/kernel/yama/ptrace_scope
+}}}
