@@ -25,7 +25,6 @@ def main():
     print get_stack_trace(pid)
 
 def get_stack_trace(pid):
-    stdout = os.readlink('/proc/{pid}/fd/1'.format(pid=pid))
     with tempfile.NamedTemporaryFile() as stackfile:
         try:
             MOVED_BACK = False
@@ -34,7 +33,7 @@ def get_stack_trace(pid):
             return read_stack_trace(stackfile)
         finally:
             if not MOVED_BACK:
-                move_stdout(pid, stdout, edge=END)
+                move_stdout(pid, edge=END)
 
 
 def read_stack_trace(stackfile):
@@ -61,49 +60,23 @@ def read_stack_trace(stackfile):
                 return ''.join(lines)
 
 
-def move_stdout(pid, stdout, edge=START):
+def move_stdout(pid, new_file=None, edge=START):
     global OLD_FD
     exe = os.readlink('/proc/{pid}/exe'.format(pid=pid))
-    format = GDB_BATCH_FORMAT_START if edge == START else GDB_BATCH_FORMAT_END
-    newfd = find_fd(pid)
+    format = GDB_BATCH_FORMAT[edge]
 
     gdb_batch = format.format(
         exe=exe,
         pid=pid,
         oldfd=OLD_FD,
         flags=os.O_RDWR | os.O_APPEND,
-        stdout=stdout)
+        stdout=new_file)
 
     with tempfile.NamedTemporaryFile() as f:
         f.write(gdb_batch)
         f.flush()
         output = Popen('gdb -batch -x {file}'.format(file=f.name), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
         OLD_FD = old_fd_re.search(output).group(1)
-
-
-def memoize(func):
-    cache = {}
-    @functools.wraps(func)
-    def _wrapped(*args, **kwargs):
-        key = args + tuple(sorted(kwargs.items()))
-        if key in cache:
-            return cache[key]
-        value = func(*args, **kwargs)
-        cache[key] = value
-        return value
-    return _wrapped
-
-
-
-@memoize
-def find_fd(pid):
-    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    hard -= 1
-    while os.path.exists('/proc/{pid}/fd/{fd}'.format(pid=pid, fd=hard)) and hard > 2:
-        hard -= 1
-    if hard <= 2:
-        raise Exception("Cannot find open fd to map stdout to!?")
-    return hard
 
 
 def parse_args():
@@ -130,7 +103,8 @@ def parse_args():
     return int(potential[0].split()[1])
 
 
-GDB_BATCH_FORMAT_START = """
+GDB_BATCH_FORMAT = {
+    START: """
 file {exe}
 attach {pid}
 call open("{stdout}", {flags})
@@ -138,15 +112,15 @@ call dup(1)
 call dup2($1, 1)
 call close($1)
 detach
-"""
-
-GDB_BATCH_FORMAT_END = """
+""",
+    END: """
 file {exe}
 attach {pid}
 call dup2({oldfd}, 1)
 call close({oldfd})
 detach
 """
+}
 
 
 if __name__ == '__main__':
