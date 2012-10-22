@@ -1,22 +1,20 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 from optparse import OptionParser
 from subprocess import Popen, PIPE
+import datetime
 import cookielib
-import functools
-import resource
 import tempfile
 import getpass
 import urllib2
 import urllib
 import time
-import sys
 import os
 import re
 
 DEVNULL = open(os.devnull, 'w')
 
 old_fd_re = re.compile(r'\$2 = (\d+)')
-heap_info_re = re.compile(r'object space (?:\w+), (?:\d+)% used \[0x\w+,0x\w+,0x\w+')
+heap_info_re = re.compile(r'space (?:\w+), (?:\d+)% used \[0x\w+,0x\w+,0x\w+')
 
 MOVED_BACK = True
 START, END = 1, 2
@@ -29,9 +27,10 @@ def main():
     if options.upgrade:
         autoupgrade()
     elif options.raw:
-        print get_stack_trace(options.pid)
+        print add_os_thread_info(options.pid, get_stack_trace(options.pid))
     else:
-        print "OTHER"
+        raise Exception("Please specify an action")
+
 
 def get_stack_trace(pid):
     with tempfile.NamedTemporaryFile() as stackfile:
@@ -98,6 +97,8 @@ def parse_args():
                       dest="raw", default=False, help="print the raw stacktrace and exit")
     parser.add_option("-u", "--upgrade", action="store_true",
                       dest="upgrade", default=False, help="automatically upgrade")
+    parser.add_option("-a", "--aggregate", default=None, dest="agg",
+                      help="Aggregate stacktraces")
     options, args = parser.parse_args()
     if bool(options.pid) and bool(options.name):
         parser.error("please specify pid or name, not both")
@@ -108,12 +109,11 @@ def parse_args():
                       shell=True,
                       stdout=PIPE).communicate()[0].splitlines()
         potential = [line for line in lines
-                     if options.name in line and
+                     if options.name.lower() in line.lower() and
                      line.split()[1] != str(os.getpid())]
 
         if len(potential) != 1:
-            parser.error("didn't get one process matched: {0}".format(
-                    len(potential)))
+            parser.error("didn't get one process matched: {0}".format(len(potential)))
         options.pid = int(potential[0].split()[1])
 
     return options
@@ -137,6 +137,56 @@ call close({oldfd})
 detach
 """
 }
+
+
+def add_os_thread_info(pid, stacktrace):
+    _thread_re = re.compile(r'^\S.*\snid=0x([0-9a-f]+)\s', re.I)
+    lines = []
+    thread_info = get_os_thread_info(pid)
+    for line in stacktrace.splitlines():
+        m = _thread_re.search(line)
+        if m:
+            nid = int(m.group(1), 16)
+        else:
+            lines.append(line)
+            continue
+        if nid in thread_info:
+            cpu, start_time = thread_info[nid]
+            line += ' cpu={cpu} start={start_time}'.format(cpu=cpu, start_time=start_time)
+        lines.append(line)
+    return '\n'.join(lines)
+
+
+def get_os_thread_info(pid):
+    pid = str(pid)
+    result = {}
+    output = Popen("ps -e -T -o pid,spid,pcpu,etime", stdout=PIPE, shell=True).communicate()[0]
+    for line in output.splitlines()[1:]:
+        row = line.split()
+        if row[0] != pid:
+            continue
+        spid = int(row[1])
+        cpu = float(row[2])
+        try:
+            start = parse_etime(row[3])
+        except Exception, e:
+            raise Exception("Couldn't parse etime: {0}".format(row[3]))
+        result[spid] = (cpu, start)
+    return result
+
+
+def parse_etime(etime):
+    info = etime.split('-', 1)
+    days = hours = minutes = seconds = 0
+    if len(info) == 2:
+        days = int(info[0].lstrip('0'))
+    info = info[-1].split(':')
+    seconds = int(info[-1].lstrip('0'))
+    if len(info) > 1:
+        minutes = int(info[-2].lstrip('0'))
+    if len(info) > 2:
+        hours = int(info[-3].lstrip('0'))
+    return datetime.datetime.now() - datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
 def autoupgrade():
