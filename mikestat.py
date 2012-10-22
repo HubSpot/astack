@@ -157,6 +157,10 @@ def autoupgrade():
                 'commit': "Sign in"}))
     r = opener.open('https://git.hubteam.com/maxiak/superjstackstat/raw/master/mikestat.py')
     contents = r.read()
+    with open(__file__, 'r') as f:
+        if f.read() == contents:
+            print "Nothing has changed... exiting"
+            return
     os.rename(__file__, __file__ + '.bak')
     print "Renamed {0} to {1}".format(__file__, __file__ + '.bak')
     print "Saved new {0}".format(__file__)
