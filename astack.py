@@ -8,6 +8,7 @@ import getpass
 import urllib2
 import urllib
 import time
+import sys
 import os
 import re
 
@@ -30,6 +31,8 @@ def main():
         print add_os_thread_info(options.pid, get_stack_trace(options.pid))
     elif options.agg:
         print aggregate(add_os_thread_info(options.pid, get_stack_trace(options.pid)), int(options.agg))
+    elif options.sample:
+        print sample(options.pid, 4, 10, int(float(options.sample) / float(10)))
     else:
         raise Exception("Please specify an action")
 
@@ -89,38 +92,6 @@ def move_stdout(pid, new_file=None, edge=START):
         OLD_FD = old_fd_re.search(output).group(1)
 
 
-def parse_args():
-    parser = OptionParser()
-    parser.add_option("-p", "--pid", dest="pid", default=None,
-                      help="process pid", metavar="PID")
-    parser.add_option("-n", "--process-name", dest="name", default=None,
-                      help="match name of process", metavar="NAME")
-    parser.add_option("-r", "--raw", action="store_true",
-                      dest="raw", default=False, help="print the raw stacktrace and exit")
-    parser.add_option("-u", "--upgrade", action="store_true",
-                      dest="upgrade", default=False, help="automatically upgrade")
-    parser.add_option("-a", "--aggregate", default=None, dest="agg",
-                      help="Aggregate stacktraces")
-    options, args = parser.parse_args()
-    if bool(options.pid) and bool(options.name):
-        parser.error("please specify pid or name, not both")
-    if options.pid:
-        options.pid = int(options.pid)
-    elif options.name:
-        lines = Popen("ps aux",
-                      shell=True,
-                      stdout=PIPE).communicate()[0].splitlines()
-        potential = [line for line in lines
-                     if options.name.lower() in line.lower() and
-                     line.split()[1] != str(os.getpid())]
-
-        if len(potential) != 1:
-            parser.error("didn't get one process matched: {0}".format(len(potential)))
-        options.pid = int(potential[0].split()[1])
-
-    return options
-
-
 GDB_BATCH_FORMAT = {
     START: """
 file {exe}
@@ -177,6 +148,39 @@ def aggregate(stacktrace, nlines):
 
     return '\n\n'.join("{0} times ({1}% total cpu)\n{2}".format(count, cpu_totals.get(key), example.get(key))
                                                                 for key, count in items)
+
+
+def sample(pid, nlines, samples, wait_time):
+    sys.stdout.write("Sampling.")
+    sys.stdout.flush()
+    thread_runnable_counts = {}
+    thread_stacks = {}
+    for _ in range(samples):
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        threads = split_threads(add_os_thread_info(pid, get_stack_trace(pid)))
+        for thread in threads:
+            thread_info = get_thread_info(thread)
+            if thread_info.get('status', '').lower().strip() != 'runnable':
+                continue
+            thread_id = thread_info.get('thread_id')
+
+            thread_runnable_counts[thread_id] = thread_runnable_counts.get(thread_id, 0) + 1
+            thread_stacks.setdefault(thread_id, []).append(thread)
+        time.sleep(wait_time)
+
+    items = sorted(thread_runnable_counts.items(), key=lambda x: x[1])
+
+    threads = []
+
+    for tid, count in items:
+        stack = thread_stacks[tid][-1]
+        stack = stack.replace('runnable', '{0:0.1f}% runnable'.format(float(count) / samples * 100), 1)
+        threads.append(stack)
+
+    print
+
+    return aggregate('\n\n'.join(threads), nlines)
 
 
 def split_threads(stacktrace):
@@ -257,6 +261,40 @@ def parse_etime(etime):
     if len(info) > 2:
         hours = int(info[-3].lstrip('0') or 0)
     return datetime.datetime.now() - datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+
+def parse_args():
+    parser = OptionParser()
+    parser.add_option("-p", "--pid", dest="pid", default=None,
+                      help="process pid", metavar="PID")
+    parser.add_option("-n", "--process-name", dest="name", default=None,
+                      help="match name of process", metavar="NAME")
+    parser.add_option("-r", "--raw", action="store_true",
+                      dest="raw", default=False, help="print the raw stacktrace and exit")
+    parser.add_option("-u", "--upgrade", action="store_true",
+                      dest="upgrade", default=False, help="automatically upgrade")
+    parser.add_option("-a", "--aggregate", default=None, dest="agg",
+                      help="Aggregate stacktraces (specify the number of lines to aggregate)")
+    parser.add_option("-s", "--sample", default=None, dest="sample",
+                      help="Sample stacktraces to the most active ones (specify the number of seconds)")
+    options, args = parser.parse_args()
+    if bool(options.pid) and bool(options.name):
+        parser.error("please specify pid or name, not both")
+    if options.pid:
+        options.pid = int(options.pid)
+    elif options.name:
+        lines = Popen("ps aux",
+                      shell=True,
+                      stdout=PIPE).communicate()[0].splitlines()
+        potential = [line for line in lines
+                     if options.name.lower() in line.lower() and
+                     line.split()[1] != str(os.getpid())]
+
+        if len(potential) != 1:
+            parser.error("didn't get one process matched: {0}".format(len(potential)))
+        options.pid = int(potential[0].split()[1])
+
+    return options
 
 
 def autoupgrade():
