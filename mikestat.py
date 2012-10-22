@@ -166,7 +166,7 @@ def autoupgrade():
     print "Saved new {0}".format(__file__)
     with open(__file__, 'w+') as f:
         f.write(contents)
-        os.chmod(f.fileno, 0755)
+        os.chmod(__file__, 0755)
 
 
 if __name__ == '__main__':
