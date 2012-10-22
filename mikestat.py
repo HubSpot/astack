@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 from optparse import OptionParser
 from subprocess import Popen, PIPE
+import cookielib
 import functools
 import resource
 import tempfile
+import getpass
+import urllib2
+import urllib
 import time
 import sys
 import os
@@ -21,8 +25,13 @@ OLD_FD = None
 
 def main():
     global MOVED_BACK
-    pid = parse_args()
-    print get_stack_trace(pid)
+    options = parse_args()
+    if options.upgrade:
+        autoupgrade()
+    elif options.raw:
+        print get_stack_trace(options.pid)
+    else:
+        print "OTHER"
 
 def get_stack_trace(pid):
     with tempfile.NamedTemporaryFile() as stackfile:
@@ -85,22 +94,29 @@ def parse_args():
                       help="process pid", metavar="PID")
     parser.add_option("-n", "--process-name", dest="name", default=None,
                       help="match name of process", metavar="NAME")
+    parser.add_option("-r", "--raw", action="store_true",
+                      dest="raw", default=False, help="print the raw stacktrace and exit")
+    parser.add_option("-u", "--upgrade", action="store_true",
+                      dest="upgrade", default=False, help="automatically upgrade")
     options, args = parser.parse_args()
-    if not (bool(options.pid) ^ bool(options.name)):
+    if bool(options.pid) and bool(options.name):
         parser.error("please specify pid or name, not both")
     if options.pid:
-        return int(options.pid)
-    lines = Popen("ps aux",
-                  shell=True,
-                  stdout=PIPE).communicate()[0].splitlines()
-    potential = [line for line in lines
-                 if options.name in line and
-                 line.split()[1] != str(os.getpid())]
+        options.pid = int(options.pid)
+    elif options.name:
+        lines = Popen("ps aux",
+                      shell=True,
+                      stdout=PIPE).communicate()[0].splitlines()
+        potential = [line for line in lines
+                     if options.name in line and
+                     line.split()[1] != str(os.getpid())]
 
-    if len(potential) != 1:
-        parser.error("didn't get one process matched: {0}".format(
-            len(potential)))
-    return int(potential[0].split()[1])
+        if len(potential) != 1:
+            parser.error("didn't get one process matched: {0}".format(
+                    len(potential)))
+        options.pid = int(potential[0].split()[1])
+
+    return options
 
 
 GDB_BATCH_FORMAT = {
@@ -121,6 +137,31 @@ call close({oldfd})
 detach
 """
 }
+
+
+def autoupgrade():
+    print "About to update from git.hubteam.com..."
+    _token_re = re.compile(r'authenticity_token.*?value="([^"]+)')
+    cj = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    content = opener.open('https://git.hubteam.com/auth/ldap').read()
+    token = _token_re.search(content).group(1)
+    username = raw_input('enter ldap username [{username}]: '.format(username=getpass.getuser())).strip()
+    if not username:
+        username = getpass.getuser()
+    password = getpass.getpass('enter ldap password: ')
+    opener.open('https://git.hubteam.com/auth/ldap', data=urllib.urlencode({
+                'username': username,
+                'password': password,
+                'authenticity_token': token,
+                'commit': "Sign in"}))
+    r = opener.open('https://git.hubteam.com/maxiak/superjstackstat/raw/master/mikestat.py')
+    contents = r.read()
+    os.rename(__file__, __file__ + '.bak')
+    print "Renamed {0} to {1}".format(__file__, __file__ + '.bak')
+    print "Saved new {0}".format(__file__)
+    with open(__file__, 'w+') as f:
+        f.write(contents)
 
 
 if __name__ == '__main__':
