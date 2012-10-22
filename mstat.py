@@ -28,6 +28,8 @@ def main():
         autoupgrade()
     elif options.raw:
         print add_os_thread_info(options.pid, get_stack_trace(options.pid))
+    elif options.agg:
+        print aggregate(add_os_thread_info(options.pid, get_stack_trace(options.pid)), int(options.agg))
     else:
         raise Exception("Please specify an action")
 
@@ -157,6 +159,74 @@ def add_os_thread_info(pid, stacktrace):
     return '\n'.join(lines)
 
 
+def aggregate(stacktrace, nlines):
+    threads = split_threads(stacktrace)
+    counter = {}
+    example = {}
+    cpu_totals = {}
+    for thread in threads:
+        if not thread.strip():
+            continue
+        thread_info = get_thread_info(thread)
+        stack = get_stack(thread)
+        top = ''.join(stack[:nlines])
+        counter[top] = counter.get(top, 0) + 1
+        cpu_totals[top] = cpu_totals.get(top, 0) + (thread_info.get('cpu') or 0)
+        example[top] = thread
+    items = sorted(counter.items(), key=lambda x: x[1])
+
+    return '\n\n'.join("{0} times ({1}% total cpu)\n{2}".format(count, cpu_totals.get(key), example.get(key))
+                                                                for key, count in items)
+
+
+def split_threads(stacktrace):
+    threads = []
+    current_thread = []
+    _thread_line_re = re.compile(r'^\S.*\sprio=.*\stid=')
+    for line in stacktrace.splitlines():
+        if _thread_line_re.search(line):
+            current_thread.append(line)
+        elif not line.strip():
+            threads.append('\n'.join(current_thread).strip())
+            current_thread = []
+        elif current_thread:
+            current_thread.append(line)
+    if current_thread:
+        threads.append('\n'.join(current_thread).strip())
+    return threads
+
+
+def get_thread_info(thread):
+    thread_re = re.compile('^"([^"]+)" (daemon)?\s*prio=(\d+) tid=0x([0-9a-f]+) nid=0x([0-9a-f]+) (.+?) \[0x[0-9a-f]+\]\s*(?:cpu=([.\d]+) start_time=(.+)$)?')
+    m = thread_re.search(thread.split('\n', 1)[0])
+    if not m:
+        return {}
+    return {
+        'name': m.group(1),
+        'daemon': bool(m.group(2)),
+        'priority': int(m.group(3)),
+        'thread_id': int(m.group(4), 16),
+        'native_id': int(m.group(5), 16),
+        'status': m.group(6).strip(),
+        'cpu': float(m.group(7)) if m.group(7) else None,
+        'start_time': m.group(8).strip() if m.group(8) else None,
+    }
+
+
+def get_stack(thread):
+    _at_re = re.compile(r'^\s+at ')
+    stack = []
+    for line in thread.splitlines()[3:]:
+        if _at_re.search(line):
+            stack.append(line.strip())
+    return stack
+
+
+def indent_text(text, indent=4):
+    indent = ' ' * indent
+    return '\n'.join(indent + line for line in text.splitlines())
+
+
 def get_os_thread_info(pid):
     pid = str(pid)
     result = {}
@@ -179,13 +249,13 @@ def parse_etime(etime):
     info = etime.split('-', 1)
     days = hours = minutes = seconds = 0
     if len(info) == 2:
-        days = int(info[0].lstrip('0'))
+        days = int(info[0].lstrip('0') or 0)
     info = info[-1].split(':')
-    seconds = int(info[-1].lstrip('0'))
+    seconds = int(info[-1].lstrip('0') or 0)
     if len(info) > 1:
-        minutes = int(info[-2].lstrip('0'))
+        minutes = int(info[-2].lstrip('0') or 0)
     if len(info) > 2:
-        hours = int(info[-3].lstrip('0'))
+        hours = int(info[-3].lstrip('0') or 0)
     return datetime.datetime.now() - datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
