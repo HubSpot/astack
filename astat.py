@@ -275,7 +275,7 @@ def autoupgrade():
                 'password': password,
                 'authenticity_token': token,
                 'commit': "Sign in"}))
-    r = opener.open('https://git.hubteam.com/maxiak/superjstackstat/raw/master/mikestat.py')
+    r = opener.open('https://git.hubteam.com/maxiak/astat/raw/master/astat.py')
     contents = r.read()
     with open(__file__, 'r') as f:
         if f.read() == contents:
