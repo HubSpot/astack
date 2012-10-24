@@ -92,7 +92,7 @@ On Ubuntu 10.04 and up you'll need to run this (as root):
 .. code-block:: bash
     # echo 0 > /proc/sys/kernel/yama/ptrace_scope
 
-=====--------
+=============
 Bugs & Issues
 =============
 
