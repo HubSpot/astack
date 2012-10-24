@@ -42,6 +42,7 @@ output:
 Usage description from the process itself:
 
 .. code-block:: bash
+
     Usage: astack [options]
 
     Options:
@@ -80,6 +81,7 @@ Install
 =======
 
 .. code-block:: bash
+
     $ sudo pip install astack
 
 
@@ -90,6 +92,7 @@ Ubuntu 10.04 and up support
 On Ubuntu 10.04 and up you'll need to run this (as root):
 
 .. code-block:: bash
+
     # echo 0 > /proc/sys/kernel/yama/ptrace_scope
 
 =============
