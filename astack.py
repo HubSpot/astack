@@ -12,6 +12,8 @@ import sys
 import os
 import re
 
+__all__ = ('main',)
+
 DEVNULL = open(os.devnull, 'w')
 
 old_fd_re = re.compile(r'\$2 = (\d+)')
