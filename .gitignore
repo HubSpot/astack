@@ -4,3 +4,4 @@
 *#*
 /test/
 *.egg-info
+/dist/
