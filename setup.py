@@ -10,7 +10,7 @@ setup(
     author='Michael Axiak',
     author_email='mike@axiak.net',
     license=open('LICENSE').read(),
-    url='https://www.github.com/HubSpot/astack/',
+    url='https://github.com/HubSpot/astack/',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Other Environment',
