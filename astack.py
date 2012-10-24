@@ -302,21 +302,8 @@ def parse_args():
 
 def autoupgrade():
     print "About to update from git.hubteam.com..."
-    _token_re = re.compile(r'authenticity_token.*?value="([^"]+)')
-    cj = cookielib.CookieJar()
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    content = opener.open('https://git.hubteam.com/auth/ldap').read()
-    token = _token_re.search(content).group(1)
-    username = raw_input('enter ldap username [{username}]: '.format(username=getpass.getuser())).strip()
-    if not username:
-        username = getpass.getuser()
-    password = getpass.getpass('enter ldap password: ')
-    opener.open('https://git.hubteam.com/auth/ldap', data=urllib.urlencode({
-                'username': username,
-                'password': password,
-                'authenticity_token': token,
-                'commit': "Sign in"}))
-    r = opener.open('https://git.hubteam.com/maxiak/astat/raw/master/astat.py')
+    r = opener.open('https://github.com/HubSpot/astack/raw/master/astack.py')
     contents = r.read()
     with open(__file__, 'r') as f:
         if f.read() == contents:
