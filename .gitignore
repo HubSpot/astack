@@ -5,3 +5,4 @@
 /test/
 *.egg-info
 /dist/
+/build/

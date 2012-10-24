@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='astack',
@@ -17,7 +17,7 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
     ],
-    packages=find_packages(),
+    py_modules=['astack'],
     entry_points={
         'console_scripts':
         ['astack=astack:main'],

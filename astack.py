@@ -36,7 +36,8 @@ def main():
     elif options.sample:
         print sample(options.pid, 4, 10, int(float(options.sample) / float(10)))
     else:
-        raise Exception("Please specify an action")
+        sys.argv = [sys.argv[0], '--help']
+        parse_args()
 
 
 def get_stack_trace(pid):
