@@ -64,7 +64,7 @@ Theory of Operation
 
 Rather than hooking into the JVM and asking it for a stack trace via instrumentation,
 this script takes the approach of sending a ``SIGQUIT`` signal and extracting the stacktrace
-from the JVM while it's running. The way it does this is by using ``gdb`` to temporary
+from the JVM while it's running. The way it does this is by using ``gdb`` to temporarily
 redirect stdout while the JVM is spouting out the thread dump, and switching it back when
 it's done. This does mean that it can occasionally get some artifacts if your JVM is
 rapidly sending output to stdout. In most typical scenarios (e.g. log lines) you wouldn't
