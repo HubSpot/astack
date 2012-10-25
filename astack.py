@@ -218,6 +218,8 @@ def sample(pid, nlines, samples, wait_time):
         stack = stack.replace('runnable', '{0:0.1f}% runnable'.format(float(count) / samples * 100), 1)
         threads.append(stack)
 
+    print
+
     return aggregate('\n\n'.join(threads), nlines)
 
 
