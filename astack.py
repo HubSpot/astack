@@ -2,10 +2,7 @@
 from optparse import OptionParser
 from subprocess import Popen, PIPE
 import datetime
-import cookielib
 import tempfile
-import getpass
-import urllib2
 import urllib
 import time
 import sys
@@ -23,6 +20,7 @@ MOVED_BACK = True
 START, END = 1, 2
 OLD_FD = None
 USE_COLOR = False
+
 
 def main():
     global MOVED_BACK, USE_COLOR
@@ -153,7 +151,7 @@ def add_os_thread_info(pid, stacktrace):
             continue
         if nid in thread_info:
             cpu, start_time = thread_info[nid]
-            line += ' cpu={cpu} start={start_time}'.format(cpu=cpu, start_time=start_time)
+            line += ' cpu={cpu} start={start_time}'.format(cpu=cpu, start_time=start_time.strftime("%Y-%m-%d %H:%M:%S"))
         lines.append(line)
     return '\n'.join(lines)
 
@@ -223,7 +221,8 @@ def sample(pid, nlines, samples, wait_time):
     return aggregate('\n\n'.join(threads), nlines)
 
 
-def split_threads(stacktrace):
+def split_threads(stacktrace, get_ends=False):
+    begin, end = [], []
     threads = []
     current_thread = []
     _thread_line_re = re.compile(r'^\S.*\sprio=.*\stid=')
@@ -233,11 +232,20 @@ def split_threads(stacktrace):
         elif not line.strip():
             threads.append('\n'.join(current_thread).strip())
             current_thread = []
+            end = []
         elif current_thread:
             current_thread.append(line)
+        elif not threads:
+            begin.append(line)
+        elif not current_thread:
+            end.append(line)
+
     if current_thread:
         threads.append('\n'.join(current_thread).strip())
-    return threads
+    if get_ends:
+        return '\n'.join(begin), threads, '\n'.join(end)
+    else:
+        return threads
 
 
 def get_thread_info(thread):
@@ -282,15 +290,21 @@ def colorize_thread(thread, line=0):
         native_id=thread_info.get("native_id", 0),
         status=colored(thread_info.get('status'), ['white','green']['runnable' in thread_info.get('status','').lower()]),
         cpu="cpu={0:.1f}% ".format(thread_info.get('cpu')) if thread_info.get('cpu') else '',
-        start_time="start_time={0}".format(thread_info.get('start_time')) if thread_info.get('start_time') else '',
-        tail=tail
+        start_time="start={0}".format(thread_info.get('start_time')) if thread_info.get('start_time') else '',
+        tail=colorize_tail(tail)
     )
+
+
+def colorize_tail(thread_tail):
+    blocked = re.compile(r'(\b)BLOCKED(\b)')
+    return blocked.sub(r'\1' + colored('BLOCKED', 'red', attrs=['bold', 'underline']) + r'\2', thread_tail)
 
 
 def colorize_stacktrace(stacktrace):
     if not USE_COLOR:
         return stacktrace
-    return '\n\n'.join(colorize_thread(thread) for thread in split_threads(stacktrace))
+    begin, threads, end = split_threads(stacktrace, True)
+    return begin.strip() + '\n\n' + '\n\n'.join(colorize_thread(thread) for thread in threads).strip() + '\n\n' + end.strip()
 
 
 def get_stack(thread):
@@ -385,9 +399,7 @@ def parse_args():
 
 def autoupgrade():
     print "About to update from git.hubteam.com..."
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    r = opener.open('https://github.com/HubSpot/astack/raw/master/astack.py')
-    contents = r.read()
+    contents = urllib.urlopen('https://github.com/HubSpot/astack/raw/master/astack.py').read()
     with open(__file__, 'r') as f:
         if f.read() == contents:
             print "Nothing has changed... exiting"
