@@ -43,8 +43,8 @@ Usage description from the process itself:
 
 .. code-block:: bash
 
-    Usage: astack.py [options]
-    
+    Usage: astack [options]
+
     Options:
       -h, --help            show this help message and exit
       -p PID, --pid=PID     process pid
@@ -60,6 +60,9 @@ Usage description from the process itself:
                             the number of seconds)
       -i INPUT, --input=INPUT
                             read stacktrace from file (or - with stdin)
+      --pretty, --pretty    Force colors
+      -g MATCH, --grep=MATCH
+                            Show only threads that match text
 
 ===================
 Theory of Operation

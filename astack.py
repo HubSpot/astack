@@ -22,18 +22,22 @@ heap_info_re = re.compile(r'space (?:\w+), (?:\d+)% used \[0x\w+,0x\w+,0x\w+')
 MOVED_BACK = True
 START, END = 1, 2
 OLD_FD = None
-
+USE_COLOR = False
 
 def main():
-    global MOVED_BACK
+    global MOVED_BACK, USE_COLOR
     options = parse_args()
     if options.upgrade:
         return autoupgrade()
+    if options.pretty:
+        USE_COLOR = True
 
     if options.raw:
-        print add_os_thread_info(options.pid, get_stack_trace(options))
+        print colorize_stacktrace(add_os_thread_info(options.pid, get_stack_trace(options)))
     elif options.agg:
         print aggregate(add_os_thread_info(options.pid, get_stack_trace(options)), int(options.agg))
+    elif options.grep:
+        print grep(add_os_thread_info(options.pid, get_stack_trace(options)), options.grep)
     elif options.sample:
         print sample(options.pid, 4, 10, int(float(options.sample) / float(10)))
     else:
@@ -170,8 +174,20 @@ def aggregate(stacktrace, nlines):
         example[top] = thread
     items = sorted(counter.items(), key=lambda x: x[1])
 
-    return '\n\n'.join("{0} times ({1}% total cpu)\n{2}".format(count, cpu_totals.get(key), example.get(key))
-                                                                for key, count in items)
+    return '\n\n'.join("{0} times ({1}% total cpu)\n{2}".format(count, cpu_totals.get(key), colorize_thread(example.get(key)))
+                       for key, count in items)
+
+
+def grep(stacktrace, text):
+    threads = []
+    text_re = re.compile(r"({0})".format(re.escape(text)))
+    for thread in split_threads(stacktrace):
+        if text.lower() not in thread.lower():
+            continue
+        if USE_COLOR:
+            thread = text_re.sub(colored(r'\1', 'red', attrs=['bold']), thread)
+        threads.append(thread)
+    return '\n\n'.join(colorize_thread(thread) for thread in threads)
 
 
 def sample(pid, nlines, samples, wait_time):
@@ -182,7 +198,7 @@ def sample(pid, nlines, samples, wait_time):
     for _ in range(samples):
         sys.stdout.write(".")
         sys.stdout.flush()
-        threads = split_threads(add_os_thread_info(pid, get_stack_trace(pid)))
+        threads = split_threads(add_os_thread_info(pid, get_stack_trace_from_pid(pid)))
         for thread in threads:
             thread_info = get_thread_info(thread)
             if thread_info.get('status', '').lower().strip() != 'runnable':
@@ -201,8 +217,6 @@ def sample(pid, nlines, samples, wait_time):
         stack = thread_stacks[tid][-1]
         stack = stack.replace('runnable', '{0:0.1f}% runnable'.format(float(count) / samples * 100), 1)
         threads.append(stack)
-
-    print
 
     return aggregate('\n\n'.join(threads), nlines)
 
@@ -225,8 +239,10 @@ def split_threads(stacktrace):
 
 
 def get_thread_info(thread):
-    thread_re = re.compile('^"([^"]+)" (daemon)?\s*prio=(\d+) tid=0x([0-9a-f]+) nid=0x([0-9a-f]+) (.+?) \[0x[0-9a-f]+\]\s*(?:cpu=([.\d]+) start_time=(.+)$)?')
-    m = thread_re.search(thread.split('\n', 1)[0])
+    _unwanted_hex_re = re.compile(r'\[0x[0-9a-f]+\]\s')
+    thread_re = re.compile(r'^"([^"]+)" (daemon)?\s*prio=(\d+) tid=0x([0-9a-f]+) nid=0x([0-9a-f]+) (.+?)\s*(?:cpu=([.\d]+) start=(.+))?$')
+    text = _unwanted_hex_re.sub('', thread.split('\n', 1)[0])
+    m = thread_re.search(text)
     if not m:
         return {}
     return {
@@ -239,6 +255,40 @@ def get_thread_info(thread):
         'cpu': float(m.group(7)) if m.group(7) else None,
         'start_time': m.group(8).strip() if m.group(8) else None,
     }
+
+
+def colorize_thread(thread, line=0):
+    if not USE_COLOR:
+        return thread
+    head = thread.strip().split("\n", 1)
+    if len(head) == 1:
+        head, tail = head[0].strip(), ''
+    else:
+        head, tail = head
+    thread_info = get_thread_info(head)
+    if not thread_info:
+        if line < 2:
+            return head + colorize_thread(tail, line + 1)
+        else:
+            return thread
+
+    return '"{name}" {daemon}prio={priority} tid=0x{thread_id:0x} nid=0x{native_id:0x} {status} {cpu}{start_time}\n{tail}'.format(
+        name=colored(thread_info.get('name', ''), 'blue'),
+        daemon=colored('daemon ' if thread_info.get('daemon') else '', 'yellow'),
+        priority=thread_info.get('priority', 0),
+        thread_id=thread_info.get('thread_id', 0),
+        native_id=thread_info.get("native_id", 0),
+        status=colored(thread_info.get('status'), ['white','green']['runnable' in thread_info.get('status','').lower()]),
+        cpu="cpu={0:.1f}% ".format(thread_info.get('cpu')) if thread_info.get('cpu') else '',
+        start_time="start_time={0}".format(thread_info.get('start_time')) if thread_info.get('start_time') else '',
+        tail=tail
+    )
+
+
+def colorize_stacktrace(stacktrace):
+    if not USE_COLOR:
+        return stacktrace
+    return '\n\n'.join(colorize_thread(thread) for thread in split_threads(stacktrace))
 
 
 def get_stack(thread):
@@ -303,7 +353,15 @@ def parse_args():
                       help="Sample stacktraces to the most active ones (specify the number of seconds)")
     parser.add_option("-i", "--input", default=None, dest="input", metavar="INPUT",
                       help="read stacktrace from file (or - with stdin)")
+    parser.add_option("--pretty", "--pretty", action="store_true",
+                      dest="pretty", default=False, help="Force colors")
+    parser.add_option("-g", "--grep", dest="grep", default=None,
+                      help="Show only threads that match text", metavar="MATCH")
     options, args = parser.parse_args()
+
+    if os.isatty(sys.stdout.fileno()):
+        options.pretty = True
+
     if bool(options.pid) and bool(options.name):
         parser.error("please specify pid or name, not both")
     if options.pid:
@@ -338,6 +396,75 @@ def autoupgrade():
     with open(__file__, 'w+') as f:
         f.write(contents)
         os.chmod(__file__, 0755)
+
+
+ATTRIBUTES = dict(
+        list(zip([
+            'bold',
+            'dark',
+            '',
+            'underline',
+            'blink',
+            '',
+            'reverse',
+            'concealed'
+            ],
+            list(range(1, 9))
+            ))
+        )
+del ATTRIBUTES['']
+
+
+HIGHLIGHTS = dict(
+        list(zip([
+            'on_grey',
+            'on_red',
+            'on_green',
+            'on_yellow',
+            'on_blue',
+            'on_magenta',
+            'on_cyan',
+            'on_white'
+            ],
+            list(range(40, 48))
+            ))
+        )
+
+
+COLORS = dict(
+        list(zip([
+            'grey',
+            'red',
+            'green',
+            'yellow',
+            'blue',
+            'magenta',
+            'cyan',
+            'white',
+            ],
+            list(range(30, 38))
+            ))
+        )
+
+
+RESET = '\033[0m'
+
+
+def colored(text, color=None, on_color=None, attrs=None):
+    if os.getenv('ANSI_COLORS_DISABLED') is None:
+        fmt_str = '\033[%dm%s'
+        if color is not None:
+            text = fmt_str % (COLORS[color], text)
+
+        if on_color is not None:
+            text = fmt_str % (HIGHLIGHTS[on_color], text)
+
+        if attrs is not None:
+            for attr in attrs:
+                text = fmt_str % (ATTRIBUTES[attr], text)
+
+        text += RESET
+    return text
 
 
 if __name__ == '__main__':
