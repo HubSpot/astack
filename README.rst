@@ -19,6 +19,17 @@ Dependencies:
 
 - gdb
 
+===========
+Screenshots
+===========
+
+.. image:: https://github.com/HubSpot/astack/raw/master/images/screenshot-aggregate.png
+    :alt: Using the aggregation option
+
+.. image:: https://github.com/HubSpot/astack/raw/master/images/screenshot-grep.png
+    :alt: Using the grep option
+
+
 ========
 Synopsis
 ========
