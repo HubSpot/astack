@@ -43,8 +43,8 @@ Usage description from the process itself:
 
 .. code-block:: bash
 
-    Usage: astack [options]
-
+    Usage: astack.py [options]
+    
     Options:
       -h, --help            show this help message and exit
       -p PID, --pid=PID     process pid
@@ -58,6 +58,8 @@ Usage description from the process itself:
       -s SAMPLE, --sample=SAMPLE
                             Sample stacktraces to the most active ones (specify
                             the number of seconds)
+      -i INPUT, --input=INPUT
+                            read stacktrace from file (or - with stdin)
 
 ===================
 Theory of Operation

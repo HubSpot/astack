@@ -28,19 +28,40 @@ def main():
     global MOVED_BACK
     options = parse_args()
     if options.upgrade:
-        autoupgrade()
-    elif options.raw:
-        print add_os_thread_info(options.pid, get_stack_trace(options.pid))
+        return autoupgrade()
+
+    if options.raw:
+        print add_os_thread_info(options.pid, get_stack_trace(options))
     elif options.agg:
-        print aggregate(add_os_thread_info(options.pid, get_stack_trace(options.pid)), int(options.agg))
+        print aggregate(add_os_thread_info(options.pid, get_stack_trace(options)), int(options.agg))
     elif options.sample:
         print sample(options.pid, 4, 10, int(float(options.sample) / float(10)))
     else:
         sys.argv = [sys.argv[0], '--help']
+        print "No action specified"
+        return parse_args()
+
+
+def get_stack_trace(options):
+    if options.pid:
+        return get_stack_trace_from_pid(options.pid)
+    elif options.input:
+        return get_stack_trace_from_file(options.input)
+    else:
+        print "Can't get stacktrace"
         parse_args()
+        raise Exception()
 
 
-def get_stack_trace(pid):
+def get_stack_trace_from_file(filename):
+    if filename.strip() == '-':
+        return sys.stdin.read()
+    else:
+        with open(filename) as f:
+            return f.read()
+
+
+def get_stack_trace_from_pid(pid):
     with tempfile.NamedTemporaryFile() as stackfile:
         try:
             MOVED_BACK = False
@@ -280,6 +301,8 @@ def parse_args():
                       help="Aggregate stacktraces (specify the number of lines to aggregate)")
     parser.add_option("-s", "--sample", default=None, dest="sample",
                       help="Sample stacktraces to the most active ones (specify the number of seconds)")
+    parser.add_option("-i", "--input", default=None, dest="input", metavar="INPUT",
+                      help="read stacktrace from file (or - with stdin)")
     options, args = parser.parse_args()
     if bool(options.pid) and bool(options.name):
         parser.error("please specify pid or name, not both")
