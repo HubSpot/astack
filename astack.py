@@ -58,6 +58,8 @@ def get_stack_trace(options):
 def get_stack_trace_from_file(filename):
     if filename.strip() == '-':
         return sys.stdin.read()
+    elif filename.startswith('http:'):
+        return urllib.urlopen(filename).read()
     else:
         with open(filename) as f:
             return f.read()
