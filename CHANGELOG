@@ -1,8 +1,0 @@
-0.0.2) 2012-10-25
-  - Added -i flag to set input
-  - Added -g to grep and display with colors
-  - Added --pretty to force it to display with colors
-  - Added colors to everything
-
-0.0.1) 2012-10-24
-  - Initial release
