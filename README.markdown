@@ -89,12 +89,8 @@ On Ubuntu 10.04 and up you'll need to run this (as root):
 
 ### Bugs & Issues
 
-Feel free to file any issues with github's `issues`_ page.
+Feel free to file any issues with github's [issues](https://github.com/HubSpot/astack/issues/) page.
 
 ### License
 
-MIT License, copyright HubSpot 2012. See the bundled `LICENSE`_ file for details.
-
-
-(issues)[https://github.com/HubSpot/astack/issues/]
-(LICENSE)[https://github.com/HubSpot/astack/blob/master/LICENSE]
+MIT License, copyright HubSpot 2012. See the bundled [LICENSE](https://github.com/HubSpot/astack/blob/master/LICENSE) file for details.
