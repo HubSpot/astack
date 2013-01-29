@@ -18,9 +18,9 @@ Dependencies:
 
 ### Screenshots
 
-!(Using the aggregation option)[https://github.com/HubSpot/astack/raw/master/images/screenshot-aggregate.png]
+![Using the aggregation option](https://github.com/HubSpot/astack/raw/master/images/screenshot-aggregate.png)
 
-!(Using the grep option)[https://github.com/HubSpot/astack/raw/master/images/screenshot-grep.png]
+![Using the grep option](https://github.com/HubSpot/astack/raw/master/images/screenshot-grep.png)
 
 ### Synopsis
 
