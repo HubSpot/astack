@@ -27,17 +27,17 @@ Dependencies:
 There are two steps to invoking `astack`: (1) select which process to inspect and
 (2) specify what action to take. There are two ways to select which process:
 
-1) `-p PID` - Select based on PID
-1) `-n NAME` - Match based on case insensitive search of command line
+1. `-p PID` - Select based on PID
+1. `-n NAME` - Match based on case insensitive search of command line
 
 Note that name searching does not work if more than one process match.
 
 Once you have a process, there are a few options you can take to get different
 output:
 
-1) `-r` - Just get the raw stacktrace as if you sent a SIGQUIT to the java process and captured the stdout with some extra info.
-1) `-a NLINES` - Group and count the threads by `NLINES` of stack and display them in order of occurrence with one representative thread.
-1) `-s NSAMPLES` - Sample the threaddump a few times and display which ones are most active (most oftenly in RUNNABLE state).
+1. `-r` - Just get the raw stacktrace as if you sent a SIGQUIT to the java process and captured the stdout with some extra info.
+1. `-a NLINES` - Group and count the threads by `NLINES` of stack and display them in order of occurrence with one representative thread.
+1. `-s NSAMPLES` - Sample the threaddump a few times and display which ones are most active (most oftenly in RUNNABLE state).
 
 Usage description from the process itself:
 
