@@ -25,6 +25,7 @@ USE_COLOR = False
 def main():
     global MOVED_BACK, USE_COLOR
     options = parse_args()
+
     if options.upgrade:
         return autoupgrade()
     if options.pretty:
@@ -67,7 +68,7 @@ def get_stack_trace_from_file(filename):
 
 def get_stack_trace_from_pid(pid, use_jstack):
     if use_jstack:
-        return Popen('jstack {pid}'.format(pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
+        return Popen('{jstack} {pid}'.format(jstack=find_jstack(), pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
     else:
         with tempfile.NamedTemporaryFile() as stackfile:
             try:
@@ -78,6 +79,15 @@ def get_stack_trace_from_pid(pid, use_jstack):
             finally:
                 if not MOVED_BACK:
                     move_stdout(pid, edge=END)
+
+
+def find_jstack():
+    default = Popen("which jstack", stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
+    if default.strip():
+        return default.strip()
+    if os.environ.get('JAVA_HOME'):
+        return os.path.join(os.environ['JAVA_HOME'], 'bin', 'jstack')
+    raise RuntimeError("Could not find jstack - do you have it installed in $JAVA_HOME?")
 
 
 def read_stack_trace(stackfile):
@@ -378,8 +388,8 @@ def parse_args():
                       dest="pretty", default=False, help="Force colors")
     parser.add_option("-g", "--grep", dest="grep", default=None,
                       help="Show only threads that match text", metavar="MATCH")
-    parser.add_option("-j", "--use-jstack", dest="jstack", action="store_true",
-                      default=False, help="Use jstack to actually get the stacktrace")
+    parser.add_option("-F", "--force", dest="jstack", action="store_false",
+                      default=True, help="Use gdb to forcibly obtain the stacktrace [DANGEROUS]")
     options, args = parser.parse_args()
 
     if os.isatty(sys.stdout.fileno()):
