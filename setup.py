@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='astack',
-    version='0.0.2',
+    version='0.0.3',
     description='Simple stacktrace analysis tool for the JVM',
     long_description=open('README.rst').read(),
     author='Michael Axiak',
