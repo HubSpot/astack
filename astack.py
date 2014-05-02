@@ -37,7 +37,7 @@ def main():
     elif options.grep:
         print grep(add_os_thread_info(options.pid, get_stack_trace(options)), options.grep)
     elif options.sample:
-        print sample(options.pid, 4, 10, int(float(options.sample) / float(10)))
+        print sample(options.pid, 4, 10, int(float(options.sample) / float(10)), options.use_jstack)
     else:
         sys.argv = [sys.argv[0], '--help']
         print "No action specified"
@@ -46,7 +46,7 @@ def main():
 
 def get_stack_trace(options):
     if options.pid:
-        return get_stack_trace_from_pid(options.pid)
+        return get_stack_trace_from_pid(options.pid, options.jstack)
     elif options.input:
         return get_stack_trace_from_file(options.input)
     else:
@@ -65,16 +65,20 @@ def get_stack_trace_from_file(filename):
             return f.read()
 
 
-def get_stack_trace_from_pid(pid):
-    with tempfile.NamedTemporaryFile() as stackfile:
-        try:
-            MOVED_BACK = False
-            move_stdout(pid, stackfile.name)
-            os.kill(pid, 3)
-            return read_stack_trace(stackfile)
-        finally:
-            if not MOVED_BACK:
-                move_stdout(pid, edge=END)
+def get_stack_trace_from_pid(pid, use_jstack):
+    if use_jstack:
+        stdout, stderr = Popen('jstack {pid}'.format(pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
+        return stdout
+    else:
+        with tempfile.NamedTemporaryFile() as stackfile:
+            try:
+                MOVED_BACK = False
+                move_stdout(pid, stackfile.name)
+                os.kill(pid, 3)
+                return read_stack_trace(stackfile)
+            finally:
+                if not MOVED_BACK:
+                    move_stdout(pid, edge=END)
 
 
 def read_stack_trace(stackfile):
@@ -190,7 +194,7 @@ def grep(stacktrace, text):
     return '\n\n'.join(colorize_thread(thread) for thread in threads)
 
 
-def sample(pid, nlines, samples, wait_time):
+def sample(pid, nlines, samples, wait_time, use_jstack):
     sys.stdout.write("Sampling.")
     sys.stdout.flush()
     thread_runnable_counts = {}
@@ -198,7 +202,7 @@ def sample(pid, nlines, samples, wait_time):
     for _ in range(samples):
         sys.stdout.write(".")
         sys.stdout.flush()
-        threads = split_threads(add_os_thread_info(pid, get_stack_trace_from_pid(pid)))
+        threads = split_threads(add_os_thread_info(pid, get_stack_trace_from_pid(pid, use_jstack)))
         for thread in threads:
             thread_info = get_thread_info(thread)
             if thread_info.get('status', '').lower().strip() != 'runnable':
@@ -375,6 +379,8 @@ def parse_args():
                       dest="pretty", default=False, help="Force colors")
     parser.add_option("-g", "--grep", dest="grep", default=None,
                       help="Show only threads that match text", metavar="MATCH")
+    parser.add_option("-j", "--use-jstack", dest="jstack", action="store_true",
+                      default=False, help="Use jstack to actually get the stacktrace")
     options, args = parser.parse_args()
 
     if os.isatty(sys.stdout.fileno()):
