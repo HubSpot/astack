@@ -37,7 +37,7 @@ def main():
     elif options.grep:
         print grep(add_os_thread_info(options.pid, get_stack_trace(options)), options.grep)
     elif options.sample:
-        print sample(options.pid, 4, 10, int(float(options.sample) / float(10)), options.use_jstack)
+        print sample(options.pid, 4, 10, int(float(options.sample) / float(10)), options.jstack)
     else:
         sys.argv = [sys.argv[0], '--help']
         print "No action specified"
@@ -67,8 +67,7 @@ def get_stack_trace_from_file(filename):
 
 def get_stack_trace_from_pid(pid, use_jstack):
     if use_jstack:
-        stdout, stderr = Popen('jstack {pid}'.format(pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
-        return stdout
+        return Popen('jstack {pid}'.format(pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
     else:
         with tempfile.NamedTemporaryFile() as stackfile:
             try:
