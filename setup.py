@@ -6,7 +6,7 @@ setup(
     name='astack',
     version='0.0.3',
     description='Simple stacktrace analysis tool for the JVM',
-    long_description=open('README.rst').read(),
+    long_description=open('README.markdown').read(),
     author='Michael Axiak',
     author_email='mike@axiak.net',
     license=open('LICENSE').read(),
