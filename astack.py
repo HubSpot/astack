@@ -31,6 +31,11 @@ def main():
     if options.pretty:
         USE_COLOR = True
 
+    if not options.pid:
+        sys.argv = [sys.argv[0], '--help']
+        print "No process specified - use -p <pid> or -n <pattern>"
+        return parse_args()
+
     if options.raw:
         print colorize_stacktrace(add_os_thread_info(options.pid, get_stack_trace(options)))
     elif options.agg:
@@ -40,9 +45,7 @@ def main():
     elif options.sample:
         print sample(options.pid, 4, 10, int(float(options.sample) / float(10)), options.jstack)
     else:
-        sys.argv = [sys.argv[0], '--help']
-        print "No action specified"
-        return parse_args()
+        print aggregate(add_os_thread_info(options.pid, get_stack_trace(options)), 10)
 
 
 def get_stack_trace(options):
