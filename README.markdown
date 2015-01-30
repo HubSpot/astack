@@ -73,7 +73,7 @@ rapidly sending output to stdout. In most typical scenarios (e.g. log lines) you
 see any interference.
 
 The advantage of using this technique is that even when a JVM is under heavy load and cannot
-fulfill a instrumentaiton approach, the low level response to a `SIGQUIT` signal is still
+fulfill a instrumentation approach, the low level response to a `SIGQUIT` signal is still
 functional. In most cases, thread dumps are most useful when the JVM is at its limit, so
 this technique can get interesting results very easily.
 
