@@ -90,7 +90,7 @@ def find_jstack():
         return default.strip()
     if os.environ.get('JAVA_HOME'):
         return os.path.join(os.environ['JAVA_HOME'], 'bin', 'jstack')
-    jvm_bin_path = os.path.join(Popen('dirname $(readlink /proc/{pid}/exe)'.format(pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0])
+    jvm_bin_path = os.path.dirname(os.readlink('/proc/{pid}/exe'.format(pid=pid)))
     if jvm_bin_path.strip():
         return os.path.join(jvm_bin_path.strip(), 'jstack')
     raise RuntimeError("Could not find jstack - do you have it installed in $JAVA_HOME?")
