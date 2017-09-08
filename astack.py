@@ -71,7 +71,7 @@ def get_stack_trace_from_file(filename):
 
 def get_stack_trace_from_pid(pid, use_jstack):
     if use_jstack:
-        return Popen('{jstack} {pid}'.format(jstack=find_jstack(), pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
+        return Popen('{jstack} {pid}'.format(jstack=find_jstack(pid), pid=pid), stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
     else:
         with tempfile.NamedTemporaryFile() as stackfile:
             try:
@@ -84,12 +84,15 @@ def get_stack_trace_from_pid(pid, use_jstack):
                     move_stdout(pid, edge=END)
 
 
-def find_jstack():
+def find_jstack(pid):
     default = Popen("which jstack", stdout=PIPE, stdin=DEVNULL, shell=True).communicate()[0]
     if default.strip():
         return default.strip()
     if os.environ.get('JAVA_HOME'):
         return os.path.join(os.environ['JAVA_HOME'], 'bin', 'jstack')
+    jvm_bin_path = os.path.dirname(os.readlink('/proc/{pid}/exe'.format(pid=pid)))
+    if jvm_bin_path.strip():
+        return os.path.join(jvm_bin_path.strip(), 'jstack')
     raise RuntimeError("Could not find jstack - do you have it installed in $JAVA_HOME?")
 
 
